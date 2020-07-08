@@ -9,19 +9,9 @@ import json
 #####  COMMON
 
 # конектится к свичам и собирать инфу в файлы
-connect  = True
+connect  = False
 # парсить файлы и собирать из них базу в csv
 makebase = True
-
-obj = 'BD'
-
-with open('mpsg500.json') as json_file:
-    data = json.load(json_file)
-
-login   = data[obj]['login']
-passw   = data[obj]['pass' ]
-port    = data[obj]['port']
-devices = data[obj]['devices']
 
 
 base = {}
@@ -175,32 +165,32 @@ def sg500command(addr, channel, command, wait, showcomm=True):
         time.sleep(wait)
 
 
-def sg500start(addr):
+def sg500start(addr, comdata):
     print(addr+':', '---- Start ---------------')
 
     client = paramiko.SSHClient()
     client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
     try:
-        client.connect(hostname=addr, port=22)
+        client.connect(hostname=addr, port=comdata['port'])
     except Exception as exception:
         print(addr+': ', str(exception))
 
     try:
-        client.get_transport().auth_none(login)
+        client.get_transport().auth_none(comdata['login'])
         channel = client.invoke_shell()
     except Exception as exception:
         print(str(exception))
         return
 
     time.sleep(0.5)
-    sg500command(addr, channel, login    , 0.5, False)
-    sg500command(addr, channel, passw    , 1  , False)
-    sg500command(addr, channel, com_term , 1  )
-    sg500command(addr, channel, com_inst , 5  )
-    sg500command(addr, channel, com_macs , 15 )
-    sg500command(addr, channel, com_run  , 20 )
-    sg500command(addr, channel, com_log  , 15 )
+    sg500command(addr, channel, comdata['login'], 0.5, False)
+    sg500command(addr, channel, comdata['passw'], 1  , False)
+    sg500command(addr, channel, com_term        , 1  )
+    sg500command(addr, channel, com_inst        , 5  )
+    sg500command(addr, channel, com_macs        , 15 )
+    sg500command(addr, channel, com_run         , 20 )
+    sg500command(addr, channel, com_log         , 15 )
     print(addr, 'recv and decode')
     #
     lines = channel.recv(100000).decode('utf-8').split('\n')
@@ -220,7 +210,7 @@ def sg500start(addr):
 
 
 
-def _writeBase():
+def _writeBase(inv, devices):
 
     for addr in devices:
         try:   f = open(addr+'.txt', 'r')
@@ -254,7 +244,7 @@ def _writeBase():
         print(addr + ':', hostname)
 
     dt = datetime.datetime.now()
-    fn = obj+'_' + dt.strftime('%Y.%m.%d_%H.%M.%S') + '.csv'
+    fn = inv+'_' + dt.strftime('%Y.%m.%d_%H.%M.%S') + '.csv'
 
     try:
         f = open(fn, 'w')
@@ -289,23 +279,33 @@ def _writeBase():
     f.close()
 
 
-def main_func(device):
-    sg500start(device)
-
-
 def main(*args):
+    inv = 'BDtest'
+
+    with open('mpsg500.json') as json_file:
+        data = json.load(json_file)
+
+    login   = data[inv]['login'  ]
+    passw   = data[inv]['pass'   ]
+    port    = data[inv]['port'   ]
+    devices = data[inv]['devices']
 
     if(connect):
         processes = list()
         with mp.Pool(10) as pool:
+            comdata = {
+                'login': login,
+                'passw': passw,
+                'port' : port
+            }
             for device in devices:
-                processes.append(pool.apply_async(main_func, args=(device, )))
+                processes.append(pool.apply_async(sg500start, args=(device, comdata, )))
 
             for process in processes:
                 process.get()
 
     if(makebase):
-        _writeBase()
+        _writeBase(inv, devices)
 
 
 if __name__ == '__main__':
