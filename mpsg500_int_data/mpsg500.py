@@ -1,4 +1,4 @@
-import multiprocessing as mp
+﻿import multiprocessing as mp
 import paramiko
 import time
 import re
@@ -8,9 +8,9 @@ import json
 
 #####  COMMON
 
-# конектится к свичам и собирать инфу в файлы
+# get config from switch and save it to file
 connect  = False
-# парсить файлы и собирать из них базу в csv
+# read files and make csv table
 makebase = True
 
 
