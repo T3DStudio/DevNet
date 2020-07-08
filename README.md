@@ -10,7 +10,12 @@ Interface data from cisco sg500 switches:
 |             |1G-Copper|Full  |1000 |Up   |gi1/2|51  |     |ac:cc:8e:b3:e9:69|"16-Apr-2019 21:30:46 :%LINK-I-Up:  gi1/2 \n 16-Apr-2019 21:30:42 :%LINK-W-Down:  gi1/2"	|	
 |             |1G-Copper|Full  |1000 |Up   |gi1/3|51  |     |00:07:5f:a6:be:24|"16-Apr-2019 21:30:46 :%LINK-I-Up:  gi1/3 \n 16-Apr-2019 21:30:42 :%LINK-W-Down:  gi1/3" |
 
-Inventry format (json file):
+## cfg_set.py
+
+Execut commands on devices
+
+## Inventry format (json file)
+
 ```
 {
     "CampusName": {
