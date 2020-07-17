@@ -14,28 +14,32 @@ cmd_shintst  = 'show inter status'
 cmd_shmav    = 'show mac addr'
 cmd_ipdtra   = 'show ip device tracking all'
 cmd_log      = 'show log | i %'
+cmd_cdp      = 'show cdp neighbors detail'
+cmd_descr    = 'show interfaces description'
 
 base = {}
 
 _ip = 'ip'
 _vl = 'vlan'
-_st = 'state'
+_st = 'status'
+_ps = 'protocol'
 _mc = 'mac'
 _ds = 'descr'
 _in = 'int'
 _ac = 'act'
 _sp = 'speed'
+_cd = 'CDP'
+_cp = 'CDP (rem port)'
 _l1 = 'log page 1'
 _l2 = 'log page 2'
 _l3 = 'log page 3'
 _l4 = 'log page 4'
 
-forder = [_in, _vl, _st, _mc, _ip, _ds, _ac, _l1, _l2, _l3, _l4]
+forder = [_in, _vl, _st, _ps, _mc, _ip, _ds, _ac, _cd, _cp, _l1, _l2, _l3, _l4]
 
 logkeys = [_l1, _l2, _l3, _l4]
 
 LogNewColumn = 27
-
 
 # base = {'FDCXX' : {'int' : {_ip: '', ...}}}
 # Po|po
@@ -79,13 +83,13 @@ def _InterfaceToKey(istr):
         if ch.isdigit() or ch == '/':
             str1 = str1 + ch
     if str1 == '':
-        return '0'
+        return ''
     else:
         secs = str1.split('/')
         intkey = istr[0]
         for str1 in secs:
             intkey = intkey + str1.zfill(3)
-    return intkey
+    return intkey.strip()
 
 #################################### PARSE COMMANDS
 
@@ -93,35 +97,35 @@ def _ParseIntStatus(raw_out, dname):
     splt_out = raw_out.splitlines()
     for raw_str in splt_out:
         _inter = _InterfaceFromStr(raw_str)
-        _intst = _RegexGet(raw_str, '(connected|notconnect)')
-        _intds = _RegexGet(raw_str, '(?<=\d ).*(?=(connected|notconnect))')
         _intvl = _RegexGet(raw_str, '(?<=(connected |notconnect)).*?(\d{1,}|trunk|routed)')
 
-        if (_inter == '') or (_intst == '') or (_intvl == ''): continue
+        if (_inter == '') or (_intvl == ''):
+            continue
 
         _inkey = _InterfaceToKey(_inter)
-        if(_inkey == '0'): continue
+        if _inkey == '':
+            continue
 
-        _BaseAddKey(dname, _inkey, _in, _inter, False)
-
-        if _intst == 'connected' : _BaseAddKey(dname, _inkey, _st, 'True' , False)
-        if _intst == 'notconnect': _BaseAddKey(dname, _inkey, _st, 'False', False)
-
-        _BaseAddKey(dname, _inkey, _ds, _intds.strip(), False)
+        _BaseAddKey(dname, _inkey, _in, _inter        , False)
         _BaseAddKey(dname, _inkey, _vl, _intvl.strip(), False)
 
 
 def _ParseMacs(raw_out, dname):
     splt_out = raw_out.splitlines()
     for raw_str in splt_out:
-        _inter = _InterfaceFromStr(raw_str)
-        _inmac = _RegexGet(raw_str, int_mc)
+        split_str = raw_str.split()
+        if len(split_str) != 4:
+            continue
+        _inter = _InterfaceFromStr(split_str[3])
+        _inmac = _RegexGet(raw_str, split_str[1])
         _intvl = _RegexGet(raw_str, '.*(?=('+int_mc+'))')
 
-        if (_inter == '') or (_inmac == '') or (_intvl == ''): continue
+        if (_inter == '') or (_inmac == '') or (_intvl == ''):
+            continue
 
         _inkey = _InterfaceToKey(_inter)
-        if(_inkey == '0'): continue
+        if _inkey == '':
+            continue
 
         _BaseAddKey(dname, _inkey, _vl, _intvl.strip(), False)
         _BaseAddKey(dname, _inkey, _mc, _inmac        , False)
@@ -135,10 +139,12 @@ def _ParseIp(raw_out, dname):
         _intip = _RegexGet(raw_str, '(\d{1,3}\.){3}\d{1,3}')
         _intac = _RegexGet(raw_str, '(ACTIVE|INACTIVE)')
 
-        if (_inter == '') or (_inmac == '') or (_intip == ''): continue
+        if (_inter == '') or (_inmac == '') or (_intip == ''):
+            continue
 
         _inkey = _InterfaceToKey(_inter)
-        if (_inkey == '0'): continue
+        if _inkey == '':
+            continue
 
         _BaseAddKey(dname, _inkey, _ip, _intip, False)
         _BaseAddKey(dname, _inkey, _ac, _intac, False)
@@ -152,17 +158,59 @@ def _ParseLog(raw_out, dname):
             _mtime = _RegexGet(raw_str, '.*(?=%)')
             _state = _RegexGet(raw_str, '(?<= to ).*')
 
-            if (_inter == '') or (_mtime == '') or (_state == ''): continue
+            if (_inter == '') or (_mtime == '') or (_state == ''):
+                continue
 
             _inkey = _InterfaceToKey(_inter)
-            if (_inkey == '0'): continue
+            if _inkey == '':
+                continue
 
             for lk in logkeys:
                 if (len(base[dname][_inkey][lk].split('\n')) < LogNewColumn):
                     _BaseAddKey(dname, _inkey, lk, _mtime+_state, '\n')
                     break
 
+def _ParseCDPd(raw_out, dname):
+    mode = 0
+    splt_out = raw_out.splitlines()
+    for raw_str in splt_out:
+        if mode == 0:
+            _devid = _Exstr(raw_str, 'Device ID: ')
+            if _devid == '':
+                continue
+            mode = 1
+        else:
+            _inter = _InterfaceFromStr(_RegexGet(raw_str, '(?<=Interface: ).*(?=,)'))
+            _outin = _RegexGet(raw_str, '(?<= \(outgoing port\): ).*')
+            if (_inter == '') or (_devid == '') or (_outin == ''):
+                continue
 
+            _inkey = _InterfaceToKey(_inter)
+            if _inkey == '':
+                continue
+
+            _BaseAddKey(dname, _inkey, _cd, _devid, False)
+            _BaseAddKey(dname, _inkey, _cp, _outin, False)
+
+            _devid = ''
+            mode = 0
+
+def _ParseDescr(raw_out, dname):
+    splt_out = raw_out.splitlines()
+    for raw_str in splt_out:
+        splt_str = raw_str.split()
+        if len(splt_str) == 4:
+            _inter = _InterfaceFromStr(splt_str[0])
+            if _inter == '':
+                continue
+
+            _inkey = _InterfaceToKey(_inter)
+            if _inkey == '':
+                continue
+
+            _BaseAddKey(dname, _inkey, _st, splt_str[1], False)
+            _BaseAddKey(dname, _inkey, _ps, splt_str[2], False)
+            _BaseAddKey(dname, _inkey, _ds, splt_str[3], False)
 
 #################################### MAIN
 
@@ -178,7 +226,11 @@ def _writeBase(inv, mbase):
 
     firstln = True
     capt = ''
-    for device in mbase:
+
+    skeys = mbase.keys()
+    skeys.sort()
+
+    for device in skeys:
         lst = list(mbase[device].keys())
         lst.sort()
         cnt = 0
@@ -203,10 +255,7 @@ def _writeBase(inv, mbase):
     f.close()
 
 
-
-
 def main_func(device, condata, mbase):
-
     print(device, 'START')
 
     try:
@@ -235,6 +284,14 @@ def main_func(device, condata, mbase):
     # log
     tmp = net_connect.send_command(cmd_log)
     _ParseLog(tmp, hostname)
+
+    # cdp
+    tmp = net_connect.send_command(cmd_cdp)
+    _ParseCDPd(tmp, hostname)
+
+    # show descr
+    tmp = net_connect.send_command(cmd_descr)
+    _ParseDescr(tmp, hostname)
 
     net_connect.disconnect()
     print(device, 'END')
