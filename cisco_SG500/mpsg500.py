@@ -65,11 +65,11 @@ def _BaseAddKey(dname, intkey, skey, sval, add):
                 bfn_l4: ''
                 }
         })
-    if(skey in base[dname][intkey]):
-        if(not add):
+    if skey in base[dname][intkey]:
+        if not add:
             base[dname][intkey].update({skey: sval})
         else:
-            if(base[dname][intkey][skey]):
+            if base[dname][intkey][skey]:
                 base[dname][intkey].update({skey: base[dname][intkey][skey] + add + sval})
             else:
                 base[dname][intkey].update({skey: sval})
@@ -79,10 +79,12 @@ def _RegexGet(str, pat):
     match = re.search(pat, str)
     return match[0] if match else ''
 
+
 def _Exstr(str, prefix):
     if str.startswith(prefix):
         return str[len(prefix):]
     return ''
+
 
 def _InterfaceFromStr(str):
     tmp = _RegexGet(str+' ', '(?='+int_re+').*?(?=(\s))')
@@ -108,9 +110,9 @@ def _InterfaceToKey(istr):
 
 def _parseIntStr(str, hname):
     strs = str.split()
-    if(len(strs) == 9):
+    if len(strs) == 9:
         ints = _InterfaceFromStr(strs[0])
-        if(ints):
+        if ints:
             intk = _InterfaceToKey(ints)
             _BaseAddKey(hname, intk, bfn_in, ints   , '')
             _BaseAddKey(hname, intk, bfn_tp, strs[1], '')
@@ -120,45 +122,46 @@ def _parseIntStr(str, hname):
 
 
 def _parseIntCfg(str, hname, curk):
-    if(str.startswith('interface ')):
+    if str.startswith('interface '):
         curk = _InterfaceFromStr(str[10:].strip())
-        if(curk):
+        if curk:
             curk = _InterfaceToKey(curk)
     else:
-        if(curk):
+        if curk:
             tmp = _Exstr(str, ' switchport access vlan ')
-            if(tmp): _BaseAddKey(hname, curk, bfn_vl, tmp, '')
+            if tmp: _BaseAddKey(hname, curk, bfn_vl, tmp, '')
             tmp = _Exstr(str, ' switchport trunk allowed vlan add ')
-            if(tmp): _BaseAddKey(hname, curk, bfn_vl, tmp, ',')
+            if tmp: _BaseAddKey(hname, curk, bfn_vl, tmp, ',')
             tmp = _Exstr(str, ' description ')
-            if(tmp): _BaseAddKey(hname, curk, bfn_ds, tmp, '')
+            if tmp: _BaseAddKey(hname, curk, bfn_ds, tmp, '')
     return curk
 
 
 def _parseLog(str, hname):
-    if('%LINK-W-Down' in str) or ('%LINK-I-Up' in str):
+    if ('%LINK-W-Down' in str) or ('%LINK-I-Up' in str):
         ints = _InterfaceFromStr(str)
-        if(ints):
+        if ints:
             intk = _InterfaceToKey(ints)
-            if(intk):
+            if intk:
                 for lk in logkeys:
-                    if (len(base[hname][intk][lk].split('\n')) < LogNewColumn):
+                    if len(base[hname][intk][lk].split('\n')) < LogNewColumn:
                         _BaseAddKey(hname, intk, lk, str.rstrip(), '\n')
                         break
 
 
 def _parseMac(str, hname):
     strs = str.split()
-    if(len(strs) == 4):
+    if len(strs) == 4:
         ints = _InterfaceFromStr(strs[2])
-        if(ints):
+        if ints:
             intk = _InterfaceToKey(ints)
             _BaseAddKey(hname, intk, bfn_mc, strs[1], '')
+
 
 ####################################################################################
 
 def sg500command(addr, channel, command, wait, showcomm=True):
-    if(showcomm):
+    if showcomm:
         print(addr+': ', command)
     channel.send(command + "\n")
     if wait > 0:
@@ -211,7 +214,6 @@ def sg500start(addr, comdata):
 
 
 def _writeBase(inv, devices):
-
     for addr in devices:
         try:   f = open(addr+'.txt', 'r')
         except IOError:
@@ -230,16 +232,16 @@ def _writeBase(inv, devices):
                 if '#' in s:
                     hostname = _RegexGet(s, '.*(?=#)')
 
-            if(('#'+com_inst) in s): mode = 1
-            if(('#'+com_run ) in s): mode = 2
-            if(('#'+com_log ) in s): mode = 3
-            if(('#'+com_macs) in s): mode = 4
+            if ('#'+com_inst) in s: mode = 1
+            if ('#'+com_run ) in s: mode = 2
+            if ('#'+com_log ) in s: mode = 3
+            if ('#'+com_macs) in s: mode = 4
 
-            if(hostname != ''):
-                if(mode == 1): _parseIntStr(s, hostname)
-                if(mode == 2): curkey = _parseIntCfg(s, hostname, curkey)
-                if(mode == 3): _parseLog(s, hostname)
-                if(mode == 4): _parseMac(s, hostname)
+            if hostname != '':
+                if mode == 1: _parseIntStr(s, hostname)
+                if mode == 2: curkey = _parseIntCfg(s, hostname, curkey)
+                if mode == 3: _parseLog(s, hostname)
+                if mode == 4: _parseMac(s, hostname)
 
         print(addr + ':', hostname)
 
@@ -260,19 +262,19 @@ def _writeBase(inv, devices):
         cnt = 0
         for intr in lst:
             cnt += 1
-            if(cnt == 1) or ((cnt%5) == 0) or (cnt == len(lst)): strt = device
+            if (cnt == 1) or ((cnt % 5) == 0) or (cnt == len(lst)): strt = device
             else: strt = ' '
 
             for key in base[device][intr]:
-                if (firstln):
-                    if (capt == ''): capt = 'hostname;'+key
-                    else:            capt = capt + ';' + key
+                if firstln:
+                    if  capt == '': capt = 'hostname;'+key
+                    else:           capt = capt + ';' + key
 
-                if (key in logkeys): ts = '"' + base[device][intr][key] + '"'
-                else:                ts = base[device][intr][key]
+                if key in logkeys: ts = '"' + base[device][intr][key] + '"'
+                else:              ts = base[device][intr][key]
 
                 strt = strt + ';' + ts
-            if (firstln):
+            if firstln:
                 f.write(capt + '\n')
                 firstln = False
             f.write(strt + '\n')
@@ -290,7 +292,7 @@ def main(*args):
     port    = data[inv]['port'   ]
     devices = data[inv]['devices']
 
-    if(connect):
+    if connect:
         processes = list()
         with mp.Pool(10) as pool:
             comdata = {
@@ -304,7 +306,7 @@ def main(*args):
             for process in processes:
                 process.get()
 
-    if(makebase):
+    if makebase:
         _writeBase(inv, devices)
 
 
