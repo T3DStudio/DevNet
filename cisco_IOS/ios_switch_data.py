@@ -98,6 +98,10 @@ def _ParseIntStatus(raw_out, dname):
     for raw_str in splt_out:
         _inter = _InterfaceFromStr(raw_str)
         _intvl = _RegexGet(raw_str, '(?<=(connected |notconnect)).*?(\d{1,}|trunk|routed)')
+        if ' connected ' in raw_str:
+            _intst = 'up'
+        else:
+            _intst = 'down'
 
         if (_inter == '') or (_intvl == ''):
             continue
@@ -108,6 +112,7 @@ def _ParseIntStatus(raw_out, dname):
 
         _BaseAddKey(dname, _inkey, _in, _inter        , False)
         _BaseAddKey(dname, _inkey, _vl, _intvl.strip(), False)
+        _BaseAddKey(dname, _inkey, _st, _intst, False)
 
 
 def _ParseMacs(raw_out, dname):
@@ -199,7 +204,7 @@ def _ParseDescr(raw_out, dname):
     splt_out = raw_out.splitlines()
     for raw_str in splt_out:
         splt_str = raw_str.split()
-        if len(splt_str) == 4:
+        if len(splt_str) > 3:
             _inter = _InterfaceFromStr(splt_str[0])
             if _inter == '':
                 continue
@@ -210,7 +215,11 @@ def _ParseDescr(raw_out, dname):
 
             _BaseAddKey(dname, _inkey, _st, splt_str[1], False)
             _BaseAddKey(dname, _inkey, _ps, splt_str[2], False)
-            _BaseAddKey(dname, _inkey, _ds, splt_str[3], False)
+
+            splt_str.pop(0)
+            splt_str.pop(0)
+            splt_str.pop(0)
+            _BaseAddKey(dname, _inkey, _ds, ''.join(splt_str), False)
 
 #################################### MAIN
 
@@ -300,7 +309,7 @@ def main_func(device, condata, mbase):
 
 
 def main(*args):
-    inv = 'BD_test'
+    inv = 'TS'
 
     with open('cfg_set_inv.json') as json_file:
         data = json.load(json_file)
