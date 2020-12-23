@@ -8,6 +8,7 @@ import sys
 import json
 
 MaxProcess = 20
+_inventory = 'BD_test2'
 
 cmd_hostname = 'show run | include hostname'
 cmd_shintst  = 'show inter status'
@@ -16,6 +17,9 @@ cmd_ipdtra   = 'show ip device tracking all'
 cmd_log      = 'show log | i %'
 cmd_cdp      = 'show cdp neighbors detail'
 cmd_descr    = 'show interfaces description'
+cmd_tdrtest  = 'test cable-diagnostics tdr interface '
+cmd_tdrshow  = 'show cable-diagnostics tdr interface '
+cmd_tdrfiltr = ' | ex ^----|^Inter'
 
 base = {}
 
@@ -30,12 +34,14 @@ _ac = 'act'
 _sp = 'speed'
 _cd = 'CDP'
 _cp = 'CDP (rem port)'
+_td = 'tdr result'
+_tt = 'tdr time'
 _l1 = 'log page 1'
 _l2 = 'log page 2'
 _l3 = 'log page 3'
 _l4 = 'log page 4'
 
-forder = [_in, _vl, _st, _ps, _mc, _ip, _ds, _ac, _cd, _cp, _l1, _l2, _l3, _l4]
+forder = [_in, _vl, _st, _ps, _mc, _ip, _ds, _ac, _cd, _cp, _tt, _td, _l1, _l2, _l3, _l4]
 
 logkeys = [_l1, _l2, _l3, _l4]
 
@@ -221,6 +227,24 @@ def _ParseDescr(raw_out, dname):
             splt_str.pop(0)
             _BaseAddKey(dname, _inkey, _ds, ''.join(splt_str), False)
 
+def _ParseTDR(raw_out, dname, _inkey):
+    splt_out = raw_out.splitlines()
+    for raw_str in splt_out:
+        sstr = raw_str.strip()
+        if  sstr != '':
+            tmp = _Exstr(sstr, 'TDR test last run on: ')
+            if tmp != '':
+                _BaseAddKey(dname, _inkey, _tt, tmp, False)
+                continue
+            tmp = _RegexGet(sstr, 'Pair.*')
+            if tmp != '':
+                tmp = tmp.replace('Pair ','')
+                tmp = tmp.replace(' meters', 'm')
+                tmp = tmp.replace('  +/- ', '+-')
+                tmp = tmp.replace('  ', ' ').replace('  ', ' ')
+                _BaseAddKey(dname, _inkey, _td, tmp, '\n')
+
+
 #################################### MAIN
 
 def _writeBase(inv, mbase):
@@ -253,8 +277,9 @@ def _writeBase(inv, mbase):
                     if (capt == ''): capt = 'hostname;'+key
                     else:            capt = capt + ';' + key
 
-                if (key in logkeys): ts = '"' + mbase[device][intr][key] + '"'
-                else:                ts = mbase[device][intr][key]
+                ts = '"{}"'.format(mbase[device][intr][key])
+                #if (key in logkeys): ts = '"' +  + '"'
+                #else:                ts = mbase[device][intr][key]
 
                 strt = strt + ';' + ts
             if (firstln):
@@ -302,6 +327,20 @@ def main_func(device, condata, mbase):
     tmp = net_connect.send_command(cmd_descr)
     _ParseDescr(tmp, hostname)
 
+
+    print(base)
+    for i in base[hostname]:
+        if base[hostname][i][_vl] in ['40','45']:
+            net_connect.send_command(cmd_tdrtest + base[hostname][i][_in])
+            break
+    time.sleep(2)
+    for i in base[hostname]:
+        if base[hostname][i][_vl] in ['40','45']:
+            tmp = net_connect.send_command(cmd_tdrshow + base[hostname][i][_in] + cmd_tdrfiltr)
+            _ParseTDR(tmp, hostname, i)
+            break
+
+
     net_connect.disconnect()
     print(device, 'END')
 
@@ -309,7 +348,7 @@ def main_func(device, condata, mbase):
 
 
 def main(*args):
-    inv = 'TS'
+    inv = _inventory
 
     with open('cfg_set_inv.json') as json_file:
         data = json.load(json_file)
